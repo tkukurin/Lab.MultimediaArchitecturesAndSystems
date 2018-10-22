@@ -284,34 +284,6 @@ void output(FILE *file, ImageYCbCr *image) {
     fprintf(file, "%d ", (int)image->data[i].cr);
 }
 
-void print_arr(Rgb *xs, int d1, int d2, char fmt) {
-  for (int i = 0; i < d1 * d2; i++) {
-    Rgb data = *(xs + i);
-    if (fmt == 'a') {
-      printf("%d %d %d\n", data.r, data.g, data.b);
-    } else {
-      printf("%d ", fmt == 'r' ? data.r : fmt == 'g' ? data.g : data.b);
-      if (i % d1 == 0 && i > 0)
-        printf("\n");
-    }
-  }
-  printf("\n");
-}
-
-void print_y_arr(YCbCr *xs, int d1, int d2, char fmt) {
-  for (int i = 0; i < d1 * d2; i++) {
-    YCbCr data = *(xs + i);
-    if (fmt == 'a') {
-      printf("%d %d %d\n", data.y, data.cb, data.cr);
-    } else {
-      printf("%d ", fmt == 'y' ? data.y : fmt == 'b' ? data.cb : data.cr);
-      if (i % d1 == 0 && i > 0)
-        printf("\n");
-    }
-  }
-  printf("\n");
-}
-
 int main(int argc, const char **argv) {
   assert(argc == 2, "Expect file name as argument.");
 
@@ -339,16 +311,9 @@ int main(int argc, const char **argv) {
   FILE *out_file = fopen("out.txt", "w");
   output(out_file, image_quantized);
   fclose(out_file);
+  ImageYCbCr *image_unquantized = idct(image_quantized);
   IMG_FREE(image_quantized);
-
-  FILE *load_file = fopen("out.txt", "r");
-  ImageYCbCr *image_loaded = from_output_data(load_file);
-  ImageYCbCr *image_idct = idct(image_loaded);
-  IMG_FREE(image_loaded);
-  Image *image_to_rgb = to_image_rgb(image_idct);
-  IMG_FREE(image_idct);
-  IMG_FREE(image_to_rgb);
-  fclose(load_file);
+  IMG_FREE(image_unquantized);
 	return 0;
 }
 
