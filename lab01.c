@@ -53,18 +53,18 @@ Image *from_ppm_p6(FILE *file, Header header) {
 
 ImageYCbCr *from_output_data(FILE *file) {
   ImageYCbCr *image = malloc(sizeof(ImageYCbCr));
-  fscanf(file, "%d %d", image->width, image->height);
+  fscanf(file, "%d %d", &image->width, &image->height);
   int total = image->width * image->height;
   image->data = malloc(total * sizeof(YCbCr));
 
   for (int i = 0; i < total; i++)
-     fscanf(file, "%d", image->data[i].y);
+     fscanf(file, "%lf", &(image->data[i]).y);
 
   for (int i = 0; i < total; i++)
-     fscanf(file, "%d", image->data[i].cb);
+     fscanf(file, "%lf", &image->data[i].cb);
 
   for (int i = 0; i < total; i++)
-     fscanf(file, "%d", image->data[i].cr);
+     fscanf(file, "%lf", &image->data[i].cr);
 
   return image;
 }
@@ -289,10 +289,7 @@ void output_p6(FILE *file, Image *image) {
   fwrite(image->data, sizeof(Rgb), image->width * image->height, file);
 }
 
-int main(int argc, const char **argv) {
-  assert(argc == 2, "Expect file name as argument.");
-
-  const char *file_name = argv[1];
+void full_example(const char *file_name) {
   FILE *ppm_file = fopen(file_name, "r");
   assert(ppm_file != NULL, "Error opening input file.");
 
@@ -302,12 +299,10 @@ int main(int argc, const char **argv) {
   fseek(ppm_file, 1, SEEK_CUR);
 
   Image *image = from_ppm_p6(ppm_file, header);
-  print_arr(image->data, 2, 2, 'a');
   assert(image != NULL, "Error reading image.");
   fclose(ppm_file);
 
   ImageYCbCr *image_y_cb_cr = to_image_ycbcr(image);
-  print_y_arr(image_y_cb_cr->data, 2, 2, 'a');
   IMG_FREE(image);
   assert(image_y_cb_cr != NULL, "Error creating YCbCr image.");
 
@@ -319,16 +314,36 @@ int main(int argc, const char **argv) {
   output(out_file, image_quantized);
   fclose(out_file);
   ImageYCbCr *image_unquantized = idct(image_quantized);
-  print_y_arr(image_unquantized->data, 2, 2, 'a');
   IMG_FREE(image_quantized);
 
   FILE *ppm_file_out = fopen("remade.ppm", "wb");
   Image *back_to_rgb = to_image_rgb(image_unquantized);
   output_p6(ppm_file_out, back_to_rgb);
-  print_arr(back_to_rgb->data, 2, 2, 'a');
 
   fclose(ppm_file_out);
   IMG_FREE(image_unquantized);
+  IMG_FREE(back_to_rgb);
+}
+
+int main(int argc, const char **argv) {
+  assert(argc == 2, "Expect file name as argument.");
+  // full_example(argv[1]);
+
+  FILE *out = fopen("out.txt", "r");
+  ImageYCbCr *saved = from_output_data(out);
+  assert(saved->width > 0 && saved->height > 0, "Image dimensions invalid");
+  fclose(out);
+
+  ImageYCbCr *image_unquantized = idct(saved);
+  IMG_FREE(saved);
+
+  FILE *ppm_file_out = fopen("remade.ppm", "wb");
+  Image *back_to_rgb = to_image_rgb(image_unquantized);
+  IMG_FREE(image_unquantized);
+
+  output_p6(ppm_file_out, back_to_rgb);
+  fclose(ppm_file_out);
+
   IMG_FREE(back_to_rgb);
 	return 0;
 }
