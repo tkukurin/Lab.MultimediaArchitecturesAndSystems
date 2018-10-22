@@ -1,4 +1,3 @@
-
 #define COMMENT '#'
 #define DEBUG 1 
 
@@ -56,9 +55,9 @@ typedef struct {
 } Image;
 
 typedef struct {
-  int y;
-  int cb;
-  int cr;
+  double y;
+  double cb;
+  double cr;
 } YCbCr;
 
 typedef struct {

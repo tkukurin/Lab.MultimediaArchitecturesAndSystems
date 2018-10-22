@@ -3,6 +3,10 @@
 #include <string.h>
 #include <math.h>
 #include "common.c"
+#define IMG_FREE(i) \
+  if((i)->data) \
+    free((i)->data); \
+  free(i);
 
 Header ppm_header(FILE *file) {
   String *token = malloc(sizeof(String));
@@ -38,56 +42,54 @@ Image *ppm_p6_data(FILE *file, Header header) {
   image->data = malloc(total * sizeof(Rgb));
   size_t nread = fread(image->data, sizeof(Rgb), total, file);
   if (nread != total) {
-    dbg("Total nread does not equal expected size.");
-    if (image->data) {
-      free(image->data);
-    }
-
-    free(image);
+    IMG_FREE(image);
     return NULL;
   }
   return image;
 }
 
-YCbCr toYCbCr(Rgb rgb) {
+YCbCr to_y_cb_cr(Rgb rgb) {
   int R = rgb.r, G = rgb.g, B = rgb.b;
-  int y  = (int)( 0.299   * R + 0.587   * G + 0.114   * B);
-  int cb = (int)(-0.16874 * R - 0.33126 * G + 0.50000 * B);
-  int cr = (int)( 0.50000 * R - 0.41869 * G - 0.08131 * B);
-  return (YCbCr) { .y = y, .cb = cb, .cr = cr };
+  return (YCbCr) { 
+    .y  =  0.299   * R + 0.587   * G + 0.114   * B, 
+    .cb = -0.16874 * R - 0.33126 * G + 0.50000 * B + 128, 
+    .cr =  0.50000 * R - 0.41869 * G - 0.08131 * B + 128
+  };
 }
 
-ImageYCbCr *toImageYCbCr(Image *image) {
+ImageYCbCr *to_image_y_cb_cr(Image *image) {
   ImageYCbCr *ycc = malloc(sizeof(ImageYCbCr));
   ycc->width = image->width;
   ycc->height = image->height;
   int total = image->width * image->height;
   ycc->data = malloc(total * sizeof(YCbCr));
   for (int i = 0; i < total; i++)
-    ycc->data[i] = toYCbCr(image->data[i]);
+    ycc->data[i] = to_y_cb_cr(image->data[i]);
   return ycc;
 }
 
-#define DCT_BLOCK 8
+#define BLOCK_SIZE 8
 ImageYCbCr *dct(ImageYCbCr *image) {
   ImageYCbCr *result = malloc(sizeof(ImageYCbCr));
+  result->width = image->width;
+  result->height = image->height;
   result->data = malloc(image->width * image->height * sizeof(YCbCr));
 
-  double kc[2] = { 1.0 / sqrt(2), 1.0 };
+  double kc[2] = { 1.0 / sqrt(2.0), 1.0 };
   int width = image->width;
-  int nxblocks = image->width / DCT_BLOCK;
-  int nyblocks = image->height / DCT_BLOCK;
+  int nxblocks = image->width / BLOCK_SIZE;
+  int nyblocks = image->height / BLOCK_SIZE;
   int nblocks = nxblocks * nyblocks;
 
   for (int block = 0; block < nblocks; block++) {
-    int off_y = width * DCT_BLOCK * (block / nxblocks);
-    double y[DCT_BLOCK][DCT_BLOCK];
-    double cb[DCT_BLOCK][DCT_BLOCK];
-    double cr[DCT_BLOCK][DCT_BLOCK];
+    int off_y = width * BLOCK_SIZE * (block / nxblocks);
 
-    for (int off_x = 0, i = 0; i < DCT_BLOCK; i++, off_x += width) {
-      int starty = (block % nxblocks) * DCT_BLOCK + off_y + off_x;
-      int endy = starty + DCT_BLOCK;
+    double y[BLOCK_SIZE][BLOCK_SIZE] = {0};
+    double cb[BLOCK_SIZE][BLOCK_SIZE] = {0};
+    double cr[BLOCK_SIZE][BLOCK_SIZE] = {0};
+    for (int off_x = 0, i = 0; i < BLOCK_SIZE; i++, off_x += width) {
+      int starty = (block % nxblocks) * BLOCK_SIZE + off_y + off_x;
+      int endy = starty + BLOCK_SIZE;
       for (int j = starty, k = 0; j < endy; j++, k++) {
         y[i][k] = image->data[j].y - 128;
         cb[i][k] = image->data[j].cb - 128;
@@ -95,46 +97,44 @@ ImageYCbCr *dct(ImageYCbCr *image) {
       }
     }
 
-    double dct_y[DCT_BLOCK][DCT_BLOCK];
-    double dct_cb[DCT_BLOCK][DCT_BLOCK];
-    double dct_cr[DCT_BLOCK][DCT_BLOCK];
-    for (int i = 0; i < DCT_BLOCK; i++) {
-      for (int j = 0; j < DCT_BLOCK; j++) {
-        double cu = kc[i != 0];
-        double cv = kc[j != 0];
-        double ty = 0;
-        double tcb = 0;
-        double tcr = 0;
-        for (int k = 0; k < DCT_BLOCK; k++) {
-          for (int l = 0; l < DCT_BLOCK; l++) {
-            double cos_val = cos((2 * k + 1) * i * M_PI / 16.0) 
-              * cos((2 * l + 1) * j * M_PI / 16.0); 
-            ty += y[k][l] * cos_val;
-            tcb += cb[k][l] * cos_val;
-            tcr += cr[k][l] * cos_val;
+    double dct_y[BLOCK_SIZE][BLOCK_SIZE] = {0};
+    double dct_cb[BLOCK_SIZE][BLOCK_SIZE] = {0};
+    double dct_cr[BLOCK_SIZE][BLOCK_SIZE] = {0};
+    for (int i = 0; i < BLOCK_SIZE; i++) {
+      for (int j = 0; j < BLOCK_SIZE; j++) {
+        for (int k = 0; k < BLOCK_SIZE; k++) {
+          for (int l = 0; l < BLOCK_SIZE; l++) {
+            double cos_val = 
+              cos((2 * k + 1) * i * M_PI / 16.0) 
+                * cos((2 * l + 1) * j * M_PI / 16.0); 
+            dct_y[i][j] += y[k][l] * cos_val;
+            dct_cb[i][j] += cb[k][l] * cos_val;
+            dct_cr[i][j] += cr[k][l] * cos_val;
           }
         }
 
-        dct_y[i][j] = 0.25 * cu * cv * ty;
-        dct_cb[i][j] = 0.25 * cu * cv * tcb;
-        dct_cr[i][j] = 0.25 * cu * cv * tcr;
+        double cu = kc[i != 0];
+        double cv = kc[j != 0];
+        dct_y[i][j] *= 0.25 * cu * cv;
+        dct_cb[i][j] *= 0.25 * cu * cv;
+        dct_cr[i][j] *= 0.25 * cu * cv;
       }
     }
 
-    int quant_y[DCT_BLOCK][DCT_BLOCK];
-    int quant_cb[DCT_BLOCK][DCT_BLOCK];
-    int quant_cr[DCT_BLOCK][DCT_BLOCK];
-    for (int i = 0; i < DCT_BLOCK; i++) {
-      for (int j = 0; j < DCT_BLOCK; j++) {
+    int quant_y[BLOCK_SIZE][BLOCK_SIZE] = {0};
+    int quant_cb[BLOCK_SIZE][BLOCK_SIZE] = {0};
+    int quant_cr[BLOCK_SIZE][BLOCK_SIZE] = {0};
+    for (int i = 0; i < BLOCK_SIZE; i++) {
+      for (int j = 0; j < BLOCK_SIZE; j++) {
         quant_y[i][j]  = round(dct_y[i][j] / k1[i][j]);
         quant_cb[i][j] = round(dct_cb[i][j] / k2[i][j]);
         quant_cr[i][j] = round(dct_cr[i][j] / k2[i][j]);
       }
     }
 
-    for (int off_x = 0, i = 0; i < DCT_BLOCK; i++, off_x += width) {
-      int starty = (block % nxblocks) * DCT_BLOCK + off_y + off_x;
-      int endy = starty + DCT_BLOCK;
+    for (int off_x = 0, i = 0; i < BLOCK_SIZE; i++, off_x += width) {
+      int starty = (block % nxblocks) * BLOCK_SIZE + off_y + off_x;
+      int endy = starty + BLOCK_SIZE;
       for (int j = starty, k = 0; j < endy; j++, k++) {
         result->data[j] = (YCbCr) {
           .y = quant_y[i][k],
@@ -148,20 +148,64 @@ ImageYCbCr *dct(ImageYCbCr *image) {
   return result;
 }
 
+ImageYCbCr *idct(ImageYCbCr *image) {
+  ImageYCbCr *result = malloc(sizeof(ImageYCbCr));
+  result->width = image->width;
+  result->height = image->height;
+  result->data = malloc(image->width * image->height * sizeof(YCbCr));
+
+  double kc[2] = { 1.0 / sqrt(2.0), 1.0 };
+  int width = image->width;
+  int nxblocks = image->width / BLOCK_SIZE;
+  int nyblocks = image->height / BLOCK_SIZE;
+  int nblocks = nxblocks * nyblocks;
+
+  for (int block = 0; block < nblocks; block++) {
+  }
+}
+
 void output(FILE *file, ImageYCbCr *image) {
   fprintf(file, "%d %d\n", image->width, image->height);
   int n_elements = image->width * image->height;
   
   for(int i = 0; i < n_elements; i++)
-    fprintf(file, "%f ", image->data[i].y);
+    fprintf(file, "%d ", (int)image->data[i].y);
   fprintf(file, "\n");
 
   for(int i = 0; i < n_elements; i++)
-    fprintf(file, "%f ", image->data[i].cb);
+    fprintf(file, "%d ", (int)image->data[i].cb);
   fprintf(file, "\n");
 
   for(int i = 0; i < n_elements; i++)
-    fprintf(file, "%f ", image->data[i].cr);
+    fprintf(file, "%d ", (int)image->data[i].cr);
+}
+
+void print_arr(Rgb *xs, int d1, int d2, char fmt) {
+  for (int i = 0; i < d1 * d2; i++) {
+    Rgb data = *(xs + i);
+    if (fmt == 'a') {
+      printf("%d %d %d\n", data.r, data.g, data.b);
+    } else {
+      printf("%d ", fmt == 'r' ? data.r : fmt == 'g' ? data.g : data.b);
+      if (i % d1 == 0 && i > 0)
+        printf("\n");
+    }
+  }
+  printf("\n");
+}
+
+void print_y_arr(YCbCr *xs, int d1, int d2, char fmt) {
+  for (int i = 0; i < d1 * d2; i++) {
+    YCbCr data = *(xs + i);
+    if (fmt == 'a') {
+      printf("%d %d %d\n", data.y, data.cb, data.cr);
+    } else {
+      printf("%d ", fmt == 'y' ? data.y : fmt == 'b' ? data.cb : data.cr);
+      if (i % d1 == 0 && i > 0)
+        printf("\n");
+    }
+  }
+  printf("\n");
 }
 
 int main(int argc, const char **argv) {
@@ -174,27 +218,24 @@ int main(int argc, const char **argv) {
   Header header = ppm_header(ppm_file);
   assert(strcmp(header.ppm_id, "P6") == 0, "Expect P6 PPM type.");
   assert(header.max_rgb == 255, "Expect max 255 RGB");
+  fseek(ppm_file, 1, SEEK_CUR);
 
   Image *image = ppm_p6_data(ppm_file, header);
   assert(image != NULL, "Error reading image.");
   fclose(ppm_file);
 
-  ImageYCbCr *image_y_cb_cr = toImageYCbCr(image);
-  free(image->data);
-  free(image);
+  ImageYCbCr *image_y_cb_cr = to_image_y_cb_cr(image);
+  IMG_FREE(image);
   assert(image_y_cb_cr != NULL, "Error creating YCbCr image.");
 
   ImageYCbCr *image_quantized = dct(image_y_cb_cr);
-  free(image_y_cb_cr->data);
-  free(image_y_cb_cr);
+  IMG_FREE(image_y_cb_cr);
   assert(image_quantized != NULL, "Error creating DCT image.");
 
   FILE *out_file = fopen("out.txt", "w");
   output(out_file, image_quantized);
   fclose(out_file);
-  free(image_quantized->data);
-  free(image_quantized);
-
+  IMG_FREE(image_quantized);
 	return 0;
 }
 
