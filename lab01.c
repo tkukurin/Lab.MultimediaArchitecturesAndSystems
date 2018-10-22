@@ -234,10 +234,10 @@ ImageYCbCr *idct(ImageYCbCr *image) {
     double cr[BLOCK_SIZE][BLOCK_SIZE] = {0};
     for (int i = 0; i < BLOCK_SIZE; i++) {
       for (int j = 0; j < BLOCK_SIZE; j++) {
-        double cu = kc[i != 0];
-        double cv = kc[j != 0];
         for (int k = 0; k < BLOCK_SIZE; k++) {
           for (int l = 0; l < BLOCK_SIZE; l++) {
+            double cu = kc[k != 0];
+            double cv = kc[l != 0];
             double cos_val = 
               cos((2 * i + 1) * k * M_PI / 16.0) 
                 * cos((2 * j + 1) * l * M_PI / 16.0) * cu * cv; 
@@ -247,9 +247,9 @@ ImageYCbCr *idct(ImageYCbCr *image) {
           }
         }
 
-        dct_y[i][j] *= 0.25;// * cu * cv;
-        dct_cb[i][j] *= 0.25;// * cu * cv;
-        dct_cr[i][j] *= 0.25;// * cu * cv;
+        y[i][j] *= 0.25;
+        cb[i][j] *= 0.25;
+        cr[i][j] *= 0.25;
       }
     }
 
@@ -264,7 +264,6 @@ ImageYCbCr *idct(ImageYCbCr *image) {
         };
       }
     }
-
   }
 
   return result;
