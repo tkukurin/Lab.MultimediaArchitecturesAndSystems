@@ -1,3 +1,8 @@
+#define BLOCK_SIZE 8
+
+#define OUT_TXT "out.txt"
+#define OUT_PPM "out.ppm"
+
 #define COMMENT '#'
 #define IMG_FREE(i) \
   if((i)->data) \
