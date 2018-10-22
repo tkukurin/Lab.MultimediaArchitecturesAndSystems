@@ -2,12 +2,14 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
+
 #include "common.c"
+#include "debug.c"
+
 #define IMG_FREE(i) \
   if((i)->data) \
     free((i)->data); \
   free(i);
-
 
 Header ppm_header(FILE *file) {
   String *token = malloc(sizeof(String));
@@ -232,22 +234,22 @@ ImageYCbCr *idct(ImageYCbCr *image) {
     double cr[BLOCK_SIZE][BLOCK_SIZE] = {0};
     for (int i = 0; i < BLOCK_SIZE; i++) {
       for (int j = 0; j < BLOCK_SIZE; j++) {
+        double cu = kc[i != 0];
+        double cv = kc[j != 0];
         for (int k = 0; k < BLOCK_SIZE; k++) {
           for (int l = 0; l < BLOCK_SIZE; l++) {
             double cos_val = 
               cos((2 * i + 1) * k * M_PI / 16.0) 
-                * cos((2 * j + 1) * l * M_PI / 16.0); 
+                * cos((2 * j + 1) * l * M_PI / 16.0) * cu * cv; 
             y[i][j] += dct_y[k][l] * cos_val;
             cb[i][j] += dct_cb[k][l] * cos_val;
             cr[i][j] += dct_cr[k][l] * cos_val;
           }
         }
 
-        double cu = kc[i != 0];
-        double cv = kc[j != 0];
-        dct_y[i][j] *= 0.25 * cu * cv;
-        dct_cb[i][j] *= 0.25 * cu * cv;
-        dct_cr[i][j] *= 0.25 * cu * cv;
+        dct_y[i][j] *= 0.25;// * cu * cv;
+        dct_cb[i][j] *= 0.25;// * cu * cv;
+        dct_cr[i][j] *= 0.25;// * cu * cv;
       }
     }
 
@@ -284,6 +286,11 @@ void output(FILE *file, ImageYCbCr *image) {
     fprintf(file, "%d ", (int)image->data[i].cr);
 }
 
+void output_p6(FILE *file, Image *image) {
+  fprintf(file, "P6 %d %d\n", image->width, image->height);
+  fwrite(image->data, sizeof(Rgb), image->width * image->height, file);
+}
+
 int main(int argc, const char **argv) {
   assert(argc == 2, "Expect file name as argument.");
 
@@ -297,10 +304,12 @@ int main(int argc, const char **argv) {
   fseek(ppm_file, 1, SEEK_CUR);
 
   Image *image = ppm_p6_data(ppm_file, header);
+  print_arr(image->data, 2, 2, 'a');
   assert(image != NULL, "Error reading image.");
   fclose(ppm_file);
 
   ImageYCbCr *image_y_cb_cr = to_image_y_cb_cr(image);
+  print_y_arr(image_y_cb_cr->data, 2, 2, 'a');
   IMG_FREE(image);
   assert(image_y_cb_cr != NULL, "Error creating YCbCr image.");
 
@@ -312,8 +321,17 @@ int main(int argc, const char **argv) {
   output(out_file, image_quantized);
   fclose(out_file);
   ImageYCbCr *image_unquantized = idct(image_quantized);
+  print_y_arr(image_unquantized->data, 2, 2, 'a');
   IMG_FREE(image_quantized);
+
+  FILE *ppm_file_out = fopen("remade.ppm", "wb");
+  Image *back_to_rgb = to_image_rgb(image_unquantized);
+  output_p6(ppm_file_out, back_to_rgb);
+  print_arr(back_to_rgb->data, 2, 2, 'a');
+
+  fclose(ppm_file_out);
   IMG_FREE(image_unquantized);
+  IMG_FREE(back_to_rgb);
 	return 0;
 }
 

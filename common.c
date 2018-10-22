@@ -1,5 +1,9 @@
 #define COMMENT '#'
-#define DEBUG 1 
+#define IMG_FREE(i) \
+  if((i)->data) \
+    free((i)->data); \
+  free(i);
+
 
 static const double k1[][8] =
 {
@@ -65,12 +69,6 @@ typedef struct {
   size_t height;
   YCbCr *data;
 } ImageYCbCr;
-
-void dbg(const char *msg) {
-  if (DEBUG) {
-    fprintf(stderr, "[DEBUG] %s\n", msg);
-  }
-}
 
 void err(const char *msg) {
   fprintf(stderr, "[ERROR] %s\n", msg);
