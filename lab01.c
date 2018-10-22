@@ -37,7 +37,7 @@ Header ppm_header(FILE *file) {
   return header;
 }
 
-Image *ppm_p6_data(FILE *file, Header header) {
+Image *from_ppm_p6(FILE *file, Header header) {
   int total = header.width * header.height;
   Image *image = malloc(sizeof(Image));
   image->width = header.width;
@@ -69,7 +69,7 @@ ImageYCbCr *from_output_data(FILE *file) {
   return image;
 }
 
-YCbCr to_y_cb_cr(Rgb rgb) {
+YCbCr to_ycbcr(Rgb rgb) {
   int R = rgb.r, G = rgb.g, B = rgb.b;
   return (YCbCr) { 
     .y  =  0.299   * R + 0.587   * G + 0.114   * B, 
@@ -78,14 +78,14 @@ YCbCr to_y_cb_cr(Rgb rgb) {
   };
 }
 
-ImageYCbCr *to_image_y_cb_cr(Image *image) {
+ImageYCbCr *to_image_ycbcr(Image *image) {
   ImageYCbCr *ycc = malloc(sizeof(ImageYCbCr));
   ycc->width = image->width;
   ycc->height = image->height;
   int total = image->width * image->height;
   ycc->data = malloc(total * sizeof(YCbCr));
   for (int i = 0; i < total; i++)
-    ycc->data[i] = to_y_cb_cr(image->data[i]);
+    ycc->data[i] = to_ycbcr(image->data[i]);
   return ycc;
 }
 
@@ -93,7 +93,7 @@ Rgb to_rgb(YCbCr ycbcr) {
   double y = ycbcr.y, cb = ycbcr.cb, cr = ycbcr.cr;
   int maxv = 255;
   return (Rgb) {
-    .r = fmax(0, fmin(y + 2.402 * (cr - 128), maxv)),
+    .r = fmax(0, fmin(y + 1.402 * (cr - 128), maxv)),
     .g = fmax(0, fmin(y - 0.344136 * (cb - 128) - 0.714136 * (cr - 128), maxv)),
     .b = fmax(0, fmin(y + 1.772 * (cb - 128), maxv))
   };
@@ -287,7 +287,7 @@ void output(FILE *file, ImageYCbCr *image) {
 }
 
 void output_p6(FILE *file, Image *image) {
-  fprintf(file, "P6 %d %d\n", image->width, image->height);
+  fprintf(file, "P6 %d %d 255\n", image->width, image->height);
   fwrite(image->data, sizeof(Rgb), image->width * image->height, file);
 }
 
@@ -300,15 +300,15 @@ int main(int argc, const char **argv) {
 
   Header header = ppm_header(ppm_file);
   assert(strcmp(header.ppm_id, "P6") == 0, "Expect P6 PPM type.");
-  assert(header.max_rgb == 255, "Expect max 255 RGB");
+  assert(header.max_rgb == 255, "Expect 255 RGB max");
   fseek(ppm_file, 1, SEEK_CUR);
 
-  Image *image = ppm_p6_data(ppm_file, header);
+  Image *image = from_ppm_p6(ppm_file, header);
   print_arr(image->data, 2, 2, 'a');
   assert(image != NULL, "Error reading image.");
   fclose(ppm_file);
 
-  ImageYCbCr *image_y_cb_cr = to_image_y_cb_cr(image);
+  ImageYCbCr *image_y_cb_cr = to_image_ycbcr(image);
   print_y_arr(image_y_cb_cr->data, 2, 2, 'a');
   IMG_FREE(image);
   assert(image_y_cb_cr != NULL, "Error creating YCbCr image.");
