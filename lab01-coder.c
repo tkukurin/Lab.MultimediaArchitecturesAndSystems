@@ -193,7 +193,7 @@ int main(int argc, const char **argv) {
   output(out_file, image_quantized);
   fclose(out_file);
   IMG_FREE(image_quantized);
-	return 0;
+  return 0;
 }
 
 

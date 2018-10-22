@@ -150,7 +150,7 @@ int main(int argc, const char **argv) {
   fclose(ppm_file_out);
 
   IMG_FREE(back_to_rgb);
-	return 0;
+  return 0;
 }
 
 
