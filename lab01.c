@@ -72,9 +72,9 @@ ImageYCbCr *from_output_data(FILE *file) {
 YCbCr to_ycbcr(Rgb rgb) {
   int R = rgb.r, G = rgb.g, B = rgb.b;
   return (YCbCr) { 
-    .y  =  0.299   * R + 0.587   * G + 0.114   * B, 
-    .cb = -0.16874 * R - 0.33126 * G + 0.50000 * B + 128, 
-    .cr =  0.50000 * R - 0.41869 * G - 0.08131 * B + 128
+    .y  = 0.299 * R + 0.587 * G + 0.114 * B, 
+    .cb = -0.16874 * R - 0.33126 * G + 0.5 * B + 128, 
+    .cr =  0.5 * R - 0.41869 * G - 0.08131 * B + 128
   };
 }
 
@@ -91,11 +91,10 @@ ImageYCbCr *to_image_ycbcr(Image *image) {
 
 Rgb to_rgb(YCbCr ycbcr) {
   double y = ycbcr.y, cb = ycbcr.cb, cr = ycbcr.cr;
-  int maxv = 255;
   return (Rgb) {
-    .r = fmax(0, fmin(y + 1.402 * (cr - 128), maxv)),
-    .g = fmax(0, fmin(y - 0.344136 * (cb - 128) - 0.714136 * (cr - 128), maxv)),
-    .b = fmax(0, fmin(y + 1.772 * (cb - 128), maxv))
+    .r = y + 1.402 * (cr - 128),
+    .g = y - 0.344136 * (cb - 128) - 0.714136 * (cr - 128),
+    .b = y + 1.772 * (cb - 128)
   };
 }
 
@@ -258,9 +257,9 @@ ImageYCbCr *idct(ImageYCbCr *image) {
       int endy = starty + BLOCK_SIZE;
       for (int j = starty, k = 0; j < endy; j++, k++) {
         result->data[j] = (YCbCr) {
-          .y = y[i][k],
-          .cb = cb[i][k],
-          .cr = cr[i][k]
+          .y = y[i][k] + 128,
+          .cb = cb[i][k] + 128,
+          .cr = cr[i][k] +128
         };
       }
     }
