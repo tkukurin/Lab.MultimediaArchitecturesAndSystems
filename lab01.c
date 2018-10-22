@@ -8,6 +8,7 @@
     free((i)->data); \
   free(i);
 
+
 Header ppm_header(FILE *file) {
   String *token = malloc(sizeof(String));
   Header header;
@@ -48,6 +49,24 @@ Image *ppm_p6_data(FILE *file, Header header) {
   return image;
 }
 
+ImageYCbCr *from_output_data(FILE *file) {
+  ImageYCbCr *image = malloc(sizeof(ImageYCbCr));
+  fscanf(file, "%d %d", image->width, image->height);
+  int total = image->width * image->height;
+  image->data = malloc(total * sizeof(YCbCr));
+
+  for (int i = 0; i < total; i++)
+     fscanf(file, "%d", image->data[i].y);
+
+  for (int i = 0; i < total; i++)
+     fscanf(file, "%d", image->data[i].cb);
+
+  for (int i = 0; i < total; i++)
+     fscanf(file, "%d", image->data[i].cr);
+
+  return image;
+}
+
 YCbCr to_y_cb_cr(Rgb rgb) {
   int R = rgb.r, G = rgb.g, B = rgb.b;
   return (YCbCr) { 
@@ -66,6 +85,27 @@ ImageYCbCr *to_image_y_cb_cr(Image *image) {
   for (int i = 0; i < total; i++)
     ycc->data[i] = to_y_cb_cr(image->data[i]);
   return ycc;
+}
+
+Rgb to_rgb(YCbCr ycbcr) {
+  double y = ycbcr.y, cb = ycbcr.cb, cr = ycbcr.cr;
+  int maxv = 255;
+  return (Rgb) {
+    .r = fmax(0, fmin(y + 2.402 * (cr - 128), maxv)),
+    .g = fmax(0, fmin(y - 0.344136 * (cb - 128) - 0.714136 * (cr - 128), maxv)),
+    .b = fmax(0, fmin(y + 1.772 * (cb - 128), maxv))
+  };
+}
+
+Image *to_image_rgb(ImageYCbCr *image) {
+  Image *rgb = malloc(sizeof(Image));
+  rgb->width = image->width;
+  rgb->height = image->height;
+  int total = image->width * image->height;
+  rgb->data = malloc(total * sizeof(Rgb));
+  for (int i = 0; i < total; i++)
+    rgb->data[i] = to_rgb(image->data[i]);
+  return rgb;
 }
 
 #define BLOCK_SIZE 8
@@ -161,7 +201,71 @@ ImageYCbCr *idct(ImageYCbCr *image) {
   int nblocks = nxblocks * nyblocks;
 
   for (int block = 0; block < nblocks; block++) {
+    int off_y = width * BLOCK_SIZE * (block / nxblocks);
+
+    int quant_y[BLOCK_SIZE][BLOCK_SIZE] = {0};
+    int quant_cb[BLOCK_SIZE][BLOCK_SIZE] = {0};
+    int quant_cr[BLOCK_SIZE][BLOCK_SIZE] = {0};
+    for (int off_x = 0, i = 0; i < BLOCK_SIZE; i++, off_x += width) {
+      int starty = (block % nxblocks) * BLOCK_SIZE + off_y + off_x;
+      int endy = starty + BLOCK_SIZE;
+      for (int j = starty, k = 0; j < endy; j++, k++) {
+        quant_y[i][k] = image->data[j].y;
+        quant_cb[i][k] = image->data[j].cb;
+        quant_cr[i][k] = image->data[j].cr;
+      }
+    }
+
+    double dct_y[BLOCK_SIZE][BLOCK_SIZE] = {0};
+    double dct_cb[BLOCK_SIZE][BLOCK_SIZE] = {0};
+    double dct_cr[BLOCK_SIZE][BLOCK_SIZE] = {0};
+    for (int i = 0; i < BLOCK_SIZE; i++) {
+      for (int j = 0; j < BLOCK_SIZE; j++) {
+        dct_y[i][j]  = round(quant_y[i][j] * k1[i][j]);
+        dct_cb[i][j] = round(quant_cb[i][j] * k2[i][j]);
+        dct_cr[i][j] = round(quant_cr[i][j] * k2[i][j]);
+      }
+    }
+
+    double y[BLOCK_SIZE][BLOCK_SIZE] = {0};
+    double cb[BLOCK_SIZE][BLOCK_SIZE] = {0};
+    double cr[BLOCK_SIZE][BLOCK_SIZE] = {0};
+    for (int i = 0; i < BLOCK_SIZE; i++) {
+      for (int j = 0; j < BLOCK_SIZE; j++) {
+        for (int k = 0; k < BLOCK_SIZE; k++) {
+          for (int l = 0; l < BLOCK_SIZE; l++) {
+            double cos_val = 
+              cos((2 * i + 1) * k * M_PI / 16.0) 
+                * cos((2 * j + 1) * l * M_PI / 16.0); 
+            y[i][j] += dct_y[k][l] * cos_val;
+            cb[i][j] += dct_cb[k][l] * cos_val;
+            cr[i][j] += dct_cr[k][l] * cos_val;
+          }
+        }
+
+        double cu = kc[i != 0];
+        double cv = kc[j != 0];
+        dct_y[i][j] *= 0.25 * cu * cv;
+        dct_cb[i][j] *= 0.25 * cu * cv;
+        dct_cr[i][j] *= 0.25 * cu * cv;
+      }
+    }
+
+    for (int off_x = 0, i = 0; i < BLOCK_SIZE; i++, off_x += width) {
+      int starty = (block % nxblocks) * BLOCK_SIZE + off_y + off_x;
+      int endy = starty + BLOCK_SIZE;
+      for (int j = starty, k = 0; j < endy; j++, k++) {
+        result->data[j] = (YCbCr) {
+          .y = y[i][k],
+          .cb = cb[i][k],
+          .cr = cr[i][k]
+        };
+      }
+    }
+
   }
+
+  return result;
 }
 
 void output(FILE *file, ImageYCbCr *image) {
@@ -236,6 +340,15 @@ int main(int argc, const char **argv) {
   output(out_file, image_quantized);
   fclose(out_file);
   IMG_FREE(image_quantized);
+
+  FILE *load_file = fopen("out.txt", "r");
+  ImageYCbCr *image_loaded = from_output_data(load_file);
+  ImageYCbCr *image_idct = idct(image_loaded);
+  IMG_FREE(image_loaded);
+  Image *image_to_rgb = to_image_rgb(image_idct);
+  IMG_FREE(image_idct);
+  IMG_FREE(image_to_rgb);
+  fclose(load_file);
 	return 0;
 }
 
