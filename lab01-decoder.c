@@ -29,12 +29,15 @@ ImageYCbCr *from_output_data(FILE *file) {
   return image;
 }
 
+
+#define MAX(x, y) (((x) > (y)) ? (x) : (y))
+#define MIN(x, y) (((x) < (y)) ? (x) : (y))
 Rgb to_rgb(YCbCr ycbcr) {
   double y = ycbcr.y, cb = ycbcr.cb, cr = ycbcr.cr;
   return (Rgb) {
-    .r = y + 1.402 * (cr - 128),
-    .g = y - 0.344136 * (cb - 128) - 0.714136 * (cr - 128),
-    .b = y + 1.772 * (cb - 128)
+    .r = MAX(0, MIN(y + 1.402 * (cr - 128), 255)),
+    .g = MAX(0, MIN(y - 0.344136 * (cb - 128) - 0.714136 * (cr - 128), 255)),
+    .b = MAX(0, MIN(y + 1.772 * (cb - 128), 255))
   };
 }
 
