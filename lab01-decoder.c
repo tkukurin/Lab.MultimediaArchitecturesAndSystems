@@ -11,20 +11,55 @@
     free((i)->data); \
   free(i);
 
+int to_1d_index(int index, int width, int block_size, int off_x) {
+  return off_x + (index / block_size) * width + index % block_size;
+}
+
+void in_zigzag(FILE *file, ImageYCbCr *image, int m, int off_x, char mode) {
+  for (int i = 0; i < m * 2; i++) {
+    for (int j = (i < m) ? 0 : i - m + 1; j <= i && j < m; j++) {
+      int loc = (i & 1) 
+        ? j * (m - 1) + i 
+        : (i - j) * m + j;
+      int idx = to_1d_index(loc, image->width, m, off_x);
+      double *data = mode == 'y' 
+        ? &image->data[idx].y 
+        : mode == 'r' 
+          ? &image->data[idx].cr 
+          : &image->data[idx].cb;
+      //printf("here idx=%d, total=%d\n", idx, image->width * image->height);
+      fscanf(file, "%lf", data);
+    }
+  }
+}
+
 ImageYCbCr *from_output_data(FILE *file) {
   ImageYCbCr *image = malloc(sizeof(ImageYCbCr));
   fscanf(file, "%d %d", &image->width, &image->height);
-  int total = image->width * image->height;
+  int nxblocks = image->width / BLOCK_SIZE;
+  int nyblocks = image->height / BLOCK_SIZE;
+  int total = nxblocks * nyblocks;
+    //image->width * image->height;
   image->data = malloc(total * sizeof(YCbCr));
 
-  for (int i = 0; i < total; i++)
-     fscanf(file, "%lf", &(image->data[i]).y);
+  for (int block = 0, off_x = 0; block < total; block++, off_x = BLOCK_SIZE * ((off_x + 1) % (nxblocks * BLOCK_SIZE)) + ((block / nxblocks) * BLOCK_SIZE * image->width)) {
+    printf("%d offset x=%d\n", block, off_x);
+    in_zigzag(file, image, BLOCK_SIZE, off_x, 'y');
+  }
+     //fscanf(file, "%lf", &image->data[i].y);
 
-  for (int i = 0; i < total; i++)
-     fscanf(file, "%lf", &image->data[i].cb);
+  printf("done 1\n");
+  for (int block = 0, off_x = 0; block < total; block++, off_x = (off_x % nxblocks) + ((block / nxblocks) * BLOCK_SIZE * image->width)) {
+    //printf("offset x=%d\n", off_x);
+    in_zigzag(file, image, BLOCK_SIZE, off_x, 'b');
+  }
+    // fscanf(file, "%lf", &image->data[i].cb);
 
-  for (int i = 0; i < total; i++)
-     fscanf(file, "%lf", &image->data[i].cr);
+  printf("done 2\n");
+  for (int block = 0, off_x = 0; block < total; block++, off_x = (off_x % nxblocks) + ((block / nxblocks) * BLOCK_SIZE * image->width)) {
+    in_zigzag(file, image, BLOCK_SIZE, off_x, 'r');
+  } 
+     //fscanf(file, "%lf", &image->data[i].cr);
 
   return image;
 }
@@ -137,6 +172,10 @@ void output_p6(FILE *file, Image *image) {
 }
 
 int main(int argc, const char **argv) {
+  printf("%d\n", to_1d_index(0, 512, 8, 8));
+  printf("%d\n", to_1d_index(8, 512, 8, 8));
+  printf("%d\n", to_1d_index(9, 512, 8, 8));
+  printf("%d\n", to_1d_index(16, 512, 8, 8));
   FILE *out = fopen(OUT_TXT, "r");
   ImageYCbCr *saved = from_output_data(out);
   assert(saved->width > 0 && saved->height > 0, "Image dimensions invalid");

@@ -150,20 +150,64 @@ ImageYCbCr *dct(ImageYCbCr *image) {
   return result;
 }
 
+void out_zigzag(FILE *file, int *data, int m) {
+  for (int i = 0; i < m * 2; i++)
+    for (int j = (i < m) ? 0 : i - m + 1; j <= i && j < m; j++)
+      fprintf(file, "%d ", data[(i&1) ? j * (m - 1) + i : (i - j) * m + j]);
+}
+
 void output(FILE *file, ImageYCbCr *image) {
   fprintf(file, "%d %d\n", image->width, image->height);
+
   int n_elements = image->width * image->height;
-  
-  for(int i = 0; i < n_elements; i++)
-    fprintf(file, "%d ", (int)image->data[i].y);
+  int width = image->width;
+  int nxblocks = image->width / BLOCK_SIZE;
+  int nyblocks = image->height / BLOCK_SIZE;
+  int nblocks = nxblocks * nyblocks;
+  int data[BLOCK_SIZE * BLOCK_SIZE];
+
+  for (int block = 0; block < nblocks; block++) {
+    int off_y = width * BLOCK_SIZE * (block / nxblocks);
+    for (int off_x = 0, data_i = 0, i = 0; i < BLOCK_SIZE; i++, off_x += width) {
+      int starty = (block % nxblocks) * BLOCK_SIZE + off_x + off_y;
+      int endy = starty + BLOCK_SIZE;
+      for (int j = starty, k = 0; j < endy; j++, k++) {
+        data[data_i++] = (int)image->data[j].y;
+      }
+    }
+
+    out_zigzag(file, data, BLOCK_SIZE);
+  }
   fprintf(file, "\n");
 
-  for(int i = 0; i < n_elements; i++)
-    fprintf(file, "%d ", (int)image->data[i].cb);
+  for (int block = 0; block < nblocks; block++) {
+    int off_y = width * BLOCK_SIZE * (block / nxblocks);
+    for (int off_x = 0, data_i = 0, i = 0; i < BLOCK_SIZE; i++, off_x += width) {
+      int starty = (block % nxblocks) * BLOCK_SIZE + off_x + off_y;
+      int endy = starty + BLOCK_SIZE;
+      for (int j = starty, k = 0; j < endy; j++, k++) {
+        data[data_i++] = (int)image->data[j].cb;
+      }
+    }
+
+    out_zigzag(file, data, BLOCK_SIZE);
+  }
   fprintf(file, "\n");
 
-  for(int i = 0; i < n_elements; i++)
-    fprintf(file, "%d ", (int)image->data[i].cr);
+  for (int block = 0; block < nblocks; block++) {
+    int off_y = width * BLOCK_SIZE * (block / nxblocks);
+    for (int off_x = 0, data_i = 0, i = 0; i < BLOCK_SIZE; i++, off_x += width) {
+      int starty = (block % nxblocks) * BLOCK_SIZE + off_x + off_y;
+      int endy = starty + BLOCK_SIZE;
+      for (int j = starty, k = 0; j < endy; j++, k++) {
+        data[data_i++] = (int)image->data[j].cr;
+      }
+    }
+
+    out_zigzag(file, data, BLOCK_SIZE);
+  }
+
+  fprintf(file, "\n");
 }
 
 
