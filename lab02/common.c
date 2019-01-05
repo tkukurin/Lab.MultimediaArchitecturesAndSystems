@@ -6,6 +6,7 @@
     free((i)->data); \
   free(i);
 
+typedef int bool;
 
 static const double k1[][8] =
 {
@@ -48,16 +49,11 @@ typedef struct {
   int max_grayscale;
 } Header;
 
-typedef struct {
-  unsigned char r;
-  unsigned char g;
-  unsigned char b;
-} Rgb;
-
+typedef int Grayscale;
 typedef struct {
   size_t width;
   size_t height;
-  Rgb *data;
+  Grayscale *data;
 } Image;
 
 void _err(const char *msg) {

@@ -1,4 +1,4 @@
 
-pt2:
-	gcc pt2.c -lm -o pt2
+second:
+	gcc 0036485224_4zadatak.c -lm -o pt2
 
