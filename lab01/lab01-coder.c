@@ -42,10 +42,10 @@ Image *from_ppm_p6(FILE *file, Header header) {
   image->height = header.height;
   image->data = malloc(total * sizeof(Rgb));
   size_t nread = fread(image->data, sizeof(Rgb), total, file);
-  if (nread != total) {
+  /*if (nread != total) {
     IMG_FREE(image);
     return NULL;
-  }
+  }*/
   return image;
 }
 
@@ -170,39 +170,41 @@ void out_elem(FILE *file, ImageYCbCr *image, char mode) {
 
     out_zigzag(file, data, BLOCK_SIZE);
   }
-
-  fprintf(file, "\n");
 }
 
 void output(FILE *file, ImageYCbCr *image) {
   fprintf(file, "%d %d\n", image->width, image->height);
   out_elem(file, image, 'y');
+  fprintf(file, "\n\n");
   out_elem(file, image, 'b');
+  fprintf(file, "\n\n");
   out_elem(file, image, 'r');
 }
 
 
 int main(int argc, const char **argv) {
-  assert(argc == 2, "Expect file name as argument.");
+  _assert(argc == 2, "Expect file name as argument.");
   FILE *ppm_file = fopen(argv[1], "r");
-  assert(ppm_file != NULL, "Error opening input file.");
+  _assert(ppm_file != NULL, "Error opening input file.");
 
   Header header = ppm_header(ppm_file);
-  assert(strcmp(header.ppm_id, "P6") == 0, "Expect P6 PPM type.");
-  assert(header.max_rgb == 255, "Expect 255 RGB max");
-  fseek(ppm_file, 1, SEEK_CUR);
+  _assert(strcmp(header.ppm_id, "P6") == 0, "Expect P6 PPM type.");
+  _assert(header.max_rgb == 255, "Expect 255 RGB max");
+  if (getc(ppm_file) == '\r') {
+    getc(ppm_file);
+  }
 
   Image *image = from_ppm_p6(ppm_file, header);
-  assert(image != NULL, "Error reading image.");
+  _assert(image != NULL, "Error reading image.");
   fclose(ppm_file);
 
   ImageYCbCr *image_y_cb_cr = to_image_ycbcr(image);
   IMG_FREE(image);
-  assert(image_y_cb_cr != NULL, "Error creating YCbCr image.");
+  _assert(image_y_cb_cr != NULL, "Error creating YCbCr image.");
 
   ImageYCbCr *image_quantized = dct(image_y_cb_cr);
   IMG_FREE(image_y_cb_cr);
-  assert(image_quantized != NULL, "Error creating DCT image.");
+  _assert(image_quantized != NULL, "Error creating DCT image.");
 
   FILE *out_file = fopen(OUT_TXT, "w");
   output(out_file, image_quantized);

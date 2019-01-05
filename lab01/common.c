@@ -75,17 +75,17 @@ typedef struct {
   YCbCr *data;
 } ImageYCbCr;
 
-void err(const char *msg) {
+void _err(const char *msg) {
   fprintf(stderr, "[ERROR] %s\n", msg);
 }
 
-void assert(int condition_true, const char *msg) {
+void _assert(int condition_true, const char *msg) {
   if (!condition_true) {
-    err(msg);
+    _err(msg);
     exit(1);
   }
 }
 
 void skip_line(FILE *file) {
-  fscanf(file, "%*[^\n]\n", NULL);
+  fscanf(file, "%*[^\n]\n");
 }

@@ -157,7 +157,7 @@ void output_p6(FILE *file, Image *image) {
 int main(int argc, const char **argv) {
   FILE *out = fopen(OUT_TXT, "r");
   ImageYCbCr *saved = from_output_data(out);
-  assert(saved->width > 0 && saved->height > 0, "Image dimensions invalid");
+  _assert(saved->width > 0 && saved->height > 0, "Image dimensions invalid");
   fclose(out);
 
   ImageYCbCr *image_unquantized = idct(saved);
