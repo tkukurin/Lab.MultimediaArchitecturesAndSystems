@@ -49,7 +49,7 @@ typedef struct {
   int max_grayscale;
 } Header;
 
-typedef int Grayscale;
+typedef unsigned char Grayscale;
 typedef struct {
   size_t width;
   size_t height;
