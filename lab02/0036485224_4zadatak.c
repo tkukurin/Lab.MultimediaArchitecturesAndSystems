@@ -27,7 +27,7 @@ Grayscale *make_block(Image *img, int x0, int y0, int blocksize, Grayscale *bloc
 double mean_avg_disturbance(Grayscale *block1, Grayscale *block2, int n_elements) {
   int sum = 0;
   for (int i = 0; i < n_elements; i++) {
-    sum += abs(block1[i] - block2[i]);
+    sum += fabs(block1[i] - block2[i]);
   }
 
   return (double) sum / n_elements;
@@ -41,8 +41,8 @@ Point find_move_vector(Image *fst, Image *snd, Point start) {
   Grayscale *block = make_block(snd, startx, starty, BLOCK_SIZE, NULL);
 
   Point disturbance = { .delta = 999999 };
-  for (int y = fmax(0, starty - DELTA_SEARCH); y < fmin(snd->height - DELTA_SEARCH, starty + DELTA_SEARCH); y++) {
-    for (int x = fmax(0, startx - DELTA_SEARCH); x < fmin(snd->width - DELTA_SEARCH, startx + DELTA_SEARCH); x++) {
+  for (int y = fmax(0, starty - DELTA_SEARCH); y < fmin(snd->height - DELTA_SEARCH, starty + DELTA_SEARCH + 1); y++) {
+    for (int x = fmax(0, startx - DELTA_SEARCH); x < fmin(snd->width - DELTA_SEARCH, startx + DELTA_SEARCH + 1); x++) {
       block = make_block(snd, x, y, BLOCK_SIZE, block);
       double delta = mean_avg_disturbance(block, reference, BLOCK_SIZE * BLOCK_SIZE);
       if (delta < disturbance.delta) {
@@ -62,8 +62,8 @@ Point calc_startpt(Image *image, int block_nr) {
   int w = image->width;
   int line_blocks = image->width / BLOCK_SIZE;
   return (Point) { 
-    .x = (block_nr * BLOCK_SIZE) % w, 
-    .y = (block_nr * BLOCK_SIZE) / w 
+    .x = (block_nr % (w / BLOCK_SIZE)) * BLOCK_SIZE, 
+    .y = (block_nr / (w / BLOCK_SIZE)) * BLOCK_SIZE
   };
 }
 
@@ -72,11 +72,9 @@ int main(int argc, const char **argv) {
   Image *first = load_pgm(LENNA1_FNAME);
   Image *second = load_pgm(LENNA0_FNAME);
 
-  for (int i = 0; i < 60; i++) {
-    Point start = calc_startpt(first, i); //atoi(argv[1]));
-    Point solution = find_move_vector(first, second, start);
-    printf("%d -> (%d,%d)\n", i, solution.x, solution.y);
-  }
+  Point start = calc_startpt(first, atoi(argv[1]));
+  Point solution = find_move_vector(first, second, start);
+  printf("(%d,%d)\n", solution.x, solution.y);
 
   IMG_FREE(first);
   IMG_FREE(second);
