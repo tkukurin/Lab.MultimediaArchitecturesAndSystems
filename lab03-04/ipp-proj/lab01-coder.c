@@ -84,53 +84,30 @@ ImageYCbCr *dct(ImageYCbCr *image) {
   for (int block = 0; block < nxblocks * nyblocks; block++) {
     int off_y = (image->width * BLOCK_SIZE) * (block / nxblocks);
 
-    double y[BLOCK_SIZE][BLOCK_SIZE] = {0};
-    double cb[BLOCK_SIZE][BLOCK_SIZE] = {0};
-    double cr[BLOCK_SIZE][BLOCK_SIZE] = {0};
+    float y[BLOCK_SIZE * BLOCK_SIZE] = {0};
+    float cb[BLOCK_SIZE * BLOCK_SIZE] = {0};
+    float cr[BLOCK_SIZE * BLOCK_SIZE] = {0};
     for (int off_x = 0, i = 0; i < BLOCK_SIZE; i++, off_x += image->width) {
       int starty = (block % nxblocks) * BLOCK_SIZE + off_y + off_x;
       for (int j = starty, k = 0; j < starty + BLOCK_SIZE; j++, k++) {
-        y[i][k] = image->data[j].y - 128;
-        cb[i][k] = image->data[j].cb - 128;
-        cr[i][k] = image->data[j].cr - 128;
+        y[i * BLOCK_SIZE + k] = image->data[j].y - 128;
+        cb[i * BLOCK_SIZE + k] = image->data[j].cb - 128;
+        cr[i * BLOCK_SIZE + k] = image->data[j].cr - 128;
       }
     }
 
-    float dct_y[BLOCK_SIZE * BLOCK_SIZE] = {0};
-    float dct_cb[BLOCK_SIZE * BLOCK_SIZE] = {0};
-    float dct_cr[BLOCK_SIZE * BLOCK_SIZE] = {0};
-    //ippiDCT8x8Fwd_32f_C1I(dct_y);
-    //ippiDCT8x8Fwd_32f_C1I(dct_cb);
-    //ippiDCT8x8Fwd_32f_C1I(dct_cr);
-    for (int i = 0; i < BLOCK_SIZE; i++) {
-      for (int j = 0; j < BLOCK_SIZE; j++) {
-        for (int k = 0; k < BLOCK_SIZE; k++) {
-          for (int l = 0; l < BLOCK_SIZE; l++) {
-            double cos_val = 
-              cos((2 * k + 1) * i * M_PI / 16.0) 
-                * cos((2 * l + 1) * j * M_PI / 16.0); 
-            dct_y[i * BLOCK_SIZE + j] += y[k][l] * cos_val;
-            dct_cb[i * BLOCK_SIZE + j] += cb[k][l] * cos_val;
-            dct_cr[i * BLOCK_SIZE + j] += cr[k][l] * cos_val;
-          }
-        }
-
-        double cu = kc[i != 0];
-        double cv = kc[j != 0];
-        dct_y[i * BLOCK_SIZE + j] *= 0.25 * cu * cv;
-        dct_cb[i * BLOCK_SIZE + j] *= 0.25 * cu * cv;
-        dct_cr[i * BLOCK_SIZE + j] *= 0.25 * cu * cv;
-      }
-    }
+    ippiDCT8x8Fwd_32f_C1I(y);
+    ippiDCT8x8Fwd_32f_C1I(cb);
+    ippiDCT8x8Fwd_32f_C1I(cr);
 
     int quant_y[BLOCK_SIZE][BLOCK_SIZE] = {0};
     int quant_cb[BLOCK_SIZE][BLOCK_SIZE] = {0};
     int quant_cr[BLOCK_SIZE][BLOCK_SIZE] = {0};
     for (int i = 0; i < BLOCK_SIZE; i++) {
       for (int j = 0; j < BLOCK_SIZE; j++) {
-        quant_y[i][j]  = round(dct_y[i * BLOCK_SIZE + j] / k1[i][j]);
-        quant_cb[i][j] = round(dct_cb[i * BLOCK_SIZE + j] / k2[i][j]);
-        quant_cr[i][j] = round(dct_cr[i * BLOCK_SIZE + j] / k2[i][j]);
+        quant_y[i][j]  = round(y[i * BLOCK_SIZE + j] / k1[i][j]);
+        quant_cb[i][j] = round(cb[i * BLOCK_SIZE + j] / k2[i][j]);
+        quant_cr[i][j] = round(cr[i * BLOCK_SIZE + j] / k2[i][j]);
       }
     }
 

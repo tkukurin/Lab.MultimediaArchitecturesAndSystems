@@ -105,9 +105,6 @@ ImageYCbCr *idct(ImageYCbCr *image) {
     float dct_y[BLOCK_SIZE * BLOCK_SIZE] = {0};
     float dct_cb[BLOCK_SIZE * BLOCK_SIZE] = {0};
     float dct_cr[BLOCK_SIZE * BLOCK_SIZE] = {0};
-    //ippiDCT8x8Inv_32f_C1I(dct_y);
-    //ippiDCT8x8Inv_32f_C1I(dct_cb);
-    //ippiDCT8x8Inv_32f_C1I(dct_cr);
     for (int i = 0; i < BLOCK_SIZE; i++) {
       for (int j = 0; j < BLOCK_SIZE; j++) {
         dct_y[i * BLOCK_SIZE + j]  = round(quant_y[i][j] * k1[i][j]);
@@ -116,37 +113,17 @@ ImageYCbCr *idct(ImageYCbCr *image) {
       }
     }
 
-    double y[BLOCK_SIZE][BLOCK_SIZE] = {0};
-    double cb[BLOCK_SIZE][BLOCK_SIZE] = {0};
-    double cr[BLOCK_SIZE][BLOCK_SIZE] = {0};
-    for (int i = 0; i < BLOCK_SIZE; i++) {
-      for (int j = 0; j < BLOCK_SIZE; j++) {
-        for (int k = 0; k < BLOCK_SIZE; k++) {
-          for (int l = 0; l < BLOCK_SIZE; l++) {
-            double cu = kc[k != 0];
-            double cv = kc[l != 0];
-            double cos_val = 
-              cos((2 * i + 1) * k * M_PI / 16.0) 
-                * cos((2 * j + 1) * l * M_PI / 16.0) * cu * cv; 
-            y[i][j] += dct_y[k * BLOCK_SIZE + l] * cos_val;
-            cb[i][j] += dct_cb[k * BLOCK_SIZE + l] * cos_val;
-            cr[i][j] += dct_cr[k * BLOCK_SIZE + l] * cos_val;
-          }
-        }
-
-        y[i][j] *= 0.25;
-        cb[i][j] *= 0.25;
-        cr[i][j] *= 0.25;
-      }
-    }
+    ippiDCT8x8Inv_32f_C1I(dct_y);
+    ippiDCT8x8Inv_32f_C1I(dct_cb);
+    ippiDCT8x8Inv_32f_C1I(dct_cr);
 
     for (int off_x = 0, i = 0; i < BLOCK_SIZE; i++, off_x += image->width) {
       int starty = (block % nxblocks) * BLOCK_SIZE + off_y + off_x;
       for (int j = starty, k = 0; j < starty + BLOCK_SIZE; j++, k++) {
         result->data[j] = (YCbCr) {
-          .y = y[i][k] + 128,
-          .cb = cb[i][k] + 128,
-          .cr = cr[i][k] +128
+          .y = dct_y[i * BLOCK_SIZE + k] + 128,
+          .cb = dct_cb[i * BLOCK_SIZE + k] + 128,
+          .cr = dct_cr[i * BLOCK_SIZE + k] + 128
         };
       }
     }
