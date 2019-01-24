@@ -1,0 +1,6 @@
+1. dct 94.92
+2. out_elem 5.27
+3. to_ycbcr 0.00
+4. out_zigzag 0.00
+5. _assert 0.00
+Vrijeme izvodjenja: 0.19 s.
